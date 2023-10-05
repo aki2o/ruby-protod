@@ -25,13 +25,13 @@ class Protod
 
         def find_package
           Protod::Proto::Package.roots.flat_map(&:all_packages).find do
-            _1.find(SERVICE_NAME, by: :ident, as: 'Protod::Proto::Service')
+            _1.find(SERVICE_NAME, by: :ident, as: :service)
               &.find(Protod::Proto::Procedure.new(ident: PROCEDURE_NAME), by: :ident)
           end
         end
 
         def find_service_in(package)
-          package.find(Protod::Rpc::Handler::SERVICE_NAME, by: :ident, as: 'Protod::Proto::Service')
+          package.find(Protod::Rpc::Handler::SERVICE_NAME, by: :ident, as: :service)
         end
       end
 
@@ -40,21 +40,21 @@ class Protod
         @logger  = logger
 
         @procedure = @package
-                       .find(SERVICE_NAME, by: :ident, as: 'Protod::Proto::Service')
+                       .find(SERVICE_NAME, by: :ident, as: :service)
                        .find(Protod::Proto::Procedure.new(ident: PROCEDURE_NAME), by: :ident)
 
-        @request_receiver_fields  = request_proto_message.find(ONEOF_NAME, by: :ident, as: 'Protod::Proto::Oneof')
-        @response_receiver_fields = response_proto_message.find(ONEOF_NAME, by: :ident, as: 'Protod::Proto::Oneof')
+        @request_receiver_fields  = request_proto_message.find(ONEOF_NAME, by: :ident, as: :oneof)
+        @response_receiver_fields = response_proto_message.find(ONEOF_NAME, by: :ident, as: :oneof)
 
         @loaded_objects = {}
       end
 
       def request_proto_message
-        @package.find(@procedure.request_ident, by: :ident, as: 'Protod::Proto::Message')
+        @package.find(@procedure.request_ident, by: :ident, as: :message)
       end
 
       def response_proto_message
-        @package.find(@procedure.response_ident, by: :ident, as: 'Protod::Proto::Message')
+        @package.find(@procedure.response_ident, by: :ident, as: :message)
       end
 
       def register_receiver(request_field, response_field)
@@ -67,7 +67,7 @@ class Protod
 
         return unless receiver_name
 
-        req_packet = @request_receiver_fields.find(receiver_name, by: :ident, as: 'Protod::Proto::Field').then do |f|
+        req_packet = @request_receiver_fields.find(receiver_name, by: :ident, as: :field).then do |f|
           raise InvalidArgument, "Not found acceptable receiver : #{receiver_name}" unless f
 
           f.interpreter.to_rb_from(req_pb.public_send(receiver_name))
@@ -87,7 +87,7 @@ class Protod
 
         memorize_object_id_of(rb)
 
-        res_pb = @response_receiver_fields.find(receiver_name, by: :ident, as: 'Protod::Proto::Field').then do |f|
+        res_pb = @response_receiver_fields.find(receiver_name, by: :ident, as: :field).then do |f|
           f.interpreter.to_pb_from(ResponsePacket.new(procedure: req_packet.procedure, object: rb))
         end
 
@@ -97,7 +97,7 @@ class Protod
       private
 
       def response_pb_const
-        @response_pb_const ||= @package.find(@procedure.response_ident, by: :ident, as: 'Protod::Proto::Message').pb_const
+        @response_pb_const ||= @package.find(@procedure.response_ident, by: :ident, as: :message).pb_const
       end
 
       def memorize_object_id_of(value)

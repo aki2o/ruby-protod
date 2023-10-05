@@ -36,6 +36,7 @@ GEM
       activesupport (>= 5.0.0)
     faker (3.2.1)
       i18n (>= 1.8.11, < 2)
+    google-protobuf (3.24.3-x86_64-darwin)
     google-protobuf (3.24.3-x86_64-linux)
     i18n (1.14.1)
       concurrent-ruby (~> 1.0)
@@ -141,6 +142,7 @@ GEM
     yard (0.9.34)
 
 PLATFORMS
+  x86_64-darwin-21
   x86_64-linux
 
 DEPENDENCIES

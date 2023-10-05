@@ -1,8 +1,8 @@
 RSpec.describe Protod::Proto::Service, type: :model do
-  it_behaves_like :proto_part_root_feature, parentables: [:proto_package]
-  it_behaves_like :proto_part_ancestor_as_feature, parentables: [:proto_package]
-  it_behaves_like :proto_part_push_feature, childables: [:proto_procedure]
-  it_behaves_like :proto_part_freeze_feature
+  it_behaves_like :proto_part_root, parentables: [:proto_package]
+  it_behaves_like :proto_part_ancestor_as, parentables: [:proto_package]
+  it_behaves_like :proto_part_push, childables: [:proto_procedure]
+  it_behaves_like :proto_part_freeze
 
   # describe "#ident=" do
   #   subject { instance.ident = value }

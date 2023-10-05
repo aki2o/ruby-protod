@@ -1,4 +1,4 @@
-RSpec.shared_examples_for :proto_part_root_feature do |parentables: []|
+RSpec.shared_examples_for :proto_part_root do |parentables: []|
   subject { instance.root }
   let(:instance) { described_class.new(parent: parent) }
   let(:parent) { nil }
@@ -21,7 +21,7 @@ RSpec.shared_examples_for :proto_part_root_feature do |parentables: []|
   end
 end
 
-RSpec.shared_examples_for :proto_part_ancestor_as_feature do |parentables: []|
+RSpec.shared_examples_for :proto_part_ancestor_as do |parentables: []|
   subject { instance.ancestor_as(part_const) }
   let(:instance) { described_class.new(parent: parent) }
   let(:parent) { nil }
@@ -69,7 +69,7 @@ RSpec.shared_examples_for :proto_part_ancestor_as_feature do |parentables: []|
   end
 end
 
-RSpec.shared_examples_for :proto_part_push_feature do |childables: []|
+RSpec.shared_examples_for :proto_part_push do |childables: []|
   subject { instance.push(part, into: into, **options) }
   let(:instance) { described_class.new }
   let(:options) { {} }
@@ -113,7 +113,7 @@ RSpec.shared_examples_for :proto_part_push_feature do |childables: []|
   end
 end
 
-RSpec.shared_examples_for :proto_part_freeze_feature do
+RSpec.shared_examples_for :proto_part_freeze do
   subject { instance.freeze }
   let(:instance) { build("proto_#{described_class.name.split('::').last.underscore}", :has_child) }
 
@@ -131,7 +131,103 @@ RSpec.shared_examples_for :proto_part_freeze_feature do
   end
 end
 
-RSpec.shared_examples_for :proto_part_field_collectable_feature do
+RSpec.shared_examples_for :proto_part_find_with_unsupported do |children: []|
+  let(:by) { :ident }
+
+  children.each do |child|
+    context "with #{child} part" do
+      let(:part) { build("proto_#{child}") }
+
+      it { expect { subject }.to raise_error(ArgumentError, /Unsupported part :/) }
+    end
+
+    context "with the part as #{child}" do
+      let(:part) { build("proto_#{child}").ident }
+      let(:options) { super().merge(as: child) }
+
+      it { expect { subject }.to raise_error(ArgumentError, /Unsupported as :/) }
+    end
+  end
+end
+
+RSpec.shared_examples_for :proto_part_find_with_stringified do |with_find_or_push_examples: true|
+  subject { instance.find(stringified_part, by: by, **options) }
+  let(:options) { super().merge(as: part.class.name.split('::').last.underscore.to_sym ) }
+
+  context "with the part as stringified value" do
+    let(:stringified_part) { part.public_send(by) }
+
+    it { is_expected.to be_a(part.class).and have_attributes(by.to_sym => stringified_part.to_s) }
+
+    if with_find_or_push_examples
+      it_behaves_like :proto_part_find_or_push_when, :found do
+        let(:find_or_push_part) { stringified_part }
+      end
+    end
+
+    context "not matched" do
+      let(:stringified_part) { "#{super()}a" }
+
+      it { is_expected.to eq nil }
+
+      if with_find_or_push_examples
+        it_behaves_like :proto_part_find_or_push_when, :not_found do
+          let(:find_or_push_part) { stringified_part }
+        end
+      end
+    end
+  end
+end
+
+RSpec.shared_examples_for :proto_part_find_or_push_when do |the_case|
+  subject { instance.find_or_push(find_or_push_part, into: into, by: by, **options) }
+  let(:find_or_push_part) { part }
+  let(:into) { (options[:as] || part.class.name.split('::').last.underscore).to_s.pluralize.to_sym }
+
+  case the_case
+  when :found
+    it do
+      expect { subject }.to not_change { instance.public_send(into).size }
+      
+      expect(subject).to be_a(part.class).and not_eq(part).and have_attributes(by.to_sym => part.public_send(by))
+    end
+  when :not_found
+    it do
+      if part.parent
+        expect { subject }.to raise_error(ArgumentError, /Can't push already bound/)
+                                .and not_change { instance.public_send(into).size }
+      else
+        expect { subject }.to change { instance.public_send(into).size }.by(1)
+
+        expect(subject).to eq(part).and eq(instance.public_send(into).last)
+      end
+    end
+  when :not_found_and_already_pushed
+    it do
+      expect { subject }.to raise_error(ArgumentError, /Can't push already present/)
+                              .and not_change { instance.public_send(into).size }
+    end
+
+    context "with ignore" do
+      let(:options) { super().merge(ignore: true) }
+
+      it do
+        if part.parent
+          expect { subject }.to raise_error(ArgumentError, /Can't push already bound/)
+                                  .and not_change { instance.public_send(into).size }
+        else
+          expect { subject }.to not_change { instance.public_send(into).size }
+
+          expect(subject).to eq part
+        end
+      end
+    end
+  else
+    raise ArgumentError, "Unsupported the_case : #{the_case}"
+  end
+end
+
+RSpec.shared_examples_for :proto_part_field_collectable do
   subject { instance.collect_fields }
   let(:instance) { described_class.new }
 
@@ -145,7 +241,7 @@ RSpec.shared_examples_for :proto_part_field_collectable_feature do
   end
 end
 
-RSpec.shared_examples_for :proto_part_bind_feature do
+RSpec.shared_examples_for :proto_part_bind do
   subject { instance.bind(interpreter) }
   let(:instance) { described_class.new }
   let(:interpreter) { Protod::Interpreter.find_by(const) }

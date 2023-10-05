@@ -105,7 +105,7 @@ class Protod
                   else
                     part.public_send(by)
                   end
-          part  = as ? as.safe_constantize&.allocate : part
+          part  = as ? "Protod::Proto::#{as.to_s.classify}".safe_constantize&.allocate : part
           keys  = _findable_keys_for.fetch(part.class.name, nil)
           body  = _findable_body_for.fetch(part.class.name, nil)
 
@@ -117,9 +117,13 @@ class Protod
           instance_exec(by, value, &body)
         end
 
-        def find_or_push(part, into:, by:, as: nil, &body)
+        def find_or_push(part, into:, by:, as: nil, ignore: false, &body)
           new_part = if part.is_a?(::String)
-                       c = as ? as.safe_constantize : "Protod::Proto::#{into.to_s.classify}".constantize
+                       c = if as
+                             "Protod::Proto::#{as.to_s.classify}".safe_constantize
+                           else
+                             "Protod::Proto::#{into.to_s.classify}".constantize
+                           end
 
                        raise ArgumentError, "Unsupported as : #{as}" unless c
 
@@ -128,9 +132,9 @@ class Protod
                        part
                      end
 
-          as = part.is_a?(::String) ? new_part.class.name : nil
+          as = part.is_a?(::String) ? new_part.class.name.split('::').last.underscore : nil
 
-          find(part, by: by, as: as) || push(new_part, into: into).tap { body&.call(_1) }
+          find(part, by: by, as: as) || push(new_part, into: into, ignore: ignore).tap { body&.call(_1) }
         end
       end
     end

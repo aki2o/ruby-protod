@@ -1,10 +1,10 @@
 RSpec.describe Protod::Proto::Package, type: :model do
-  it_behaves_like :proto_part_root_feature, parentables: [:proto_package]
-  it_behaves_like :proto_part_ancestor_as_feature, parentables: [:proto_package]
-  it_behaves_like :proto_part_push_feature, childables: [:proto_package, :proto_service, :proto_message]
-  it_behaves_like :proto_part_freeze_feature
+  it_behaves_like :proto_part_root, parentables: [:proto_package]
+  it_behaves_like :proto_part_ancestor_as, parentables: [:proto_package]
+  it_behaves_like :proto_part_push, childables: [:proto_package, :proto_service, :proto_message]
+  it_behaves_like :proto_part_freeze
 
-  it_behaves_like :proto_part_field_collectable_feature do
+  it_behaves_like :proto_part_field_collectable do
     context "has children" do
       let(:instance) { build(:proto_package, :has_children) }
 
@@ -31,7 +31,92 @@ RSpec.describe Protod::Proto::Package, type: :model do
     end
   end
 
-  it_behaves_like :proto_part_bind_feature
+  it_behaves_like :proto_part_bind
+
+  describe "#find" do
+    subject { instance.find(part, by: by, **options) }
+    let(:instance) { build(:proto_package) }
+    let(:part) { build("proto_#{child}", parent: parent) }
+    let(:parent) { build(:proto_package, ident: parent_ident) }
+    let(:parent_ident) { instance.ident }
+    let(:options) { {} }
+
+    it_behaves_like :proto_part_find_with_unsupported, children: [:procedure, :field, :oneof]
+
+    [false, true].each do |is_frozen|
+      context "on #{is_frozen ? 'frozen' : 'not frozen'}" do
+        before { instance.freeze if is_frozen }
+
+        describe "for packages" do
+          let(:child) { :package }
+
+          describe "by full_ident" do
+            let(:by) { :full_ident }
+
+            it { is_expected.to eq nil }
+
+            context "when has child" do
+              let(:instance) { super().tap { _1.push(child_part, into: :packages) } }
+              let(:child_part) { build(:proto_package, ident: child_ident) }
+              let(:child_ident) { part.ident }
+
+              it { is_expected.to eq(child_part).and not_eq(part) }
+
+              context "has different ident" do
+                let(:child_ident) { "#{super()}new" }
+
+                it { is_expected.to eq nil }
+              end
+
+              context "with a part has parent whiches ident is different" do
+                let(:parent_ident) { "#{super()}new" }
+
+                it { is_expected.to eq nil }
+
+                it_behaves_like :proto_part_find_or_push_when, :not_found_and_already_pushed
+              end
+
+              context "with a part don't have parent" do
+                let(:parent) { nil }
+
+                it { is_expected.to eq nil }
+              end
+
+              context "with parent of the part" do
+                let(:part) { super().parent }
+
+                it { is_expected.to eq(instance).and not_eq(parent) }
+              end
+
+              context "has grand child" do
+                let(:child_part) { super().tap { _1.push(grand_child_part, into: :packages) } }
+                let(:grand_child_part) { build(:proto_package, ident: grand_child_ident) }
+                let(:grand_child_ident) { part.ident }
+                let(:child_ident) { build(:proto_package).ident }
+
+                let(:parent) { super().tap { _1.parent = grand_parent } }
+                let(:parent_ident) { child_ident }
+                let(:grand_parent) { build(:proto_package, ident: instance.ident) }
+
+                it { is_expected.to eq(grand_child_part).and not_eq(part) }
+
+                it_behaves_like :proto_part_find_with_stringified, with_find_or_push_examples: false
+                it_behaves_like :proto_part_find_or_push_when, :found
+
+                context "with a part has parent whiches ident is different" do
+                  let(:parent_ident) { "#{super()}new" }
+
+                  it { is_expected.to eq nil }
+
+                  it_behaves_like :proto_part_find_or_push_when, :not_found
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
 
 #   describe ".find_or_register_package" do
 #     subject { described_class.find_or_register_package('foo.bar.baz', **options) }

@@ -109,7 +109,7 @@ class Protod
           def to_pb_from(rb)
             return unless rb
 
-            f = proto_message.find('value', by: :ident, as: 'Protod::Proto::Field')
+            f = proto_message.find('value', by: :ident, as: :field)
 
             return unless f
 
@@ -150,8 +150,8 @@ class Protod
             raise Protod::Rpc::Handler::InvalidArgument, "Not set procedure" unless procedure
 
             f = proto_message
-                  .find(Protod::Rpc::Request::Receiver::ONEOF_NAME, by: :ident, as: 'Protod::Proto::Oneof')
-                  .find(procedure, by: :ident, as: 'Protod::Proto::Field')
+                  .find(Protod::Rpc::Request::Receiver::ONEOF_NAME, by: :ident, as: :oneof)
+                  .find(procedure, by: :ident, as: :field)
 
             raise Protod::Rpc::Handler::InvalidArgument, "Not found acceptable procedure : #{procedure}" unless f
 
@@ -186,8 +186,8 @@ class Protod
 
           def to_pb_from(packet)
             f = proto_message
-                  .find(Protod::Rpc::Response::Receiver::ONEOF_NAME, by: :ident, as: 'Protod::Proto::Oneof')
-                  .find(packet.procedure, by: :ident, as: 'Protod::Proto::Field')
+                  .find(Protod::Rpc::Response::Receiver::ONEOF_NAME, by: :ident, as: :oneof)
+                  .find(packet.procedure, by: :ident, as: :field)
 
             pb = f.interpreter.to_pb_from(packet.object)
 
