@@ -37,8 +37,7 @@ RSpec.describe Protod::Proto::Package, type: :model do
     subject { instance.find(part, by: by, **options) }
     let(:instance) { build(:proto_package) }
     let(:part) { build("proto_#{child}", parent: parent) }
-    let(:parent) { build(:proto_package, ident: parent_ident) }
-    let(:parent_ident) { instance.ident }
+    let(:parent) { nil }
     let(:options) { {} }
 
     it_behaves_like :proto_part_find_with_unsupported, children: [:procedure, :field, :oneof]
@@ -49,26 +48,32 @@ RSpec.describe Protod::Proto::Package, type: :model do
 
         describe "for packages" do
           let(:child) { :package }
+          let(:by) { :full_ident }
 
-          describe "by full_ident" do
-            let(:by) { :full_ident }
+          it { is_expected.to eq nil }
+
+          context "when has child" do
+            let(:instance) { super().tap { _1.push(child_part, into: :packages) } }
+            let(:child_part) { build(:proto_package, ident: child_ident) }
+            let(:child_ident) { part.ident }
 
             it { is_expected.to eq nil }
 
-            context "when has child" do
-              let(:instance) { super().tap { _1.push(child_part, into: :packages) } }
-              let(:child_part) { build(:proto_package, ident: child_ident) }
-              let(:child_ident) { part.ident }
+            it_behaves_like :proto_part_find_or_push_when, :not_found_and_already_pushed
+
+            context "with a part has parent" do
+              let(:parent) { build(:proto_package, ident: parent_ident) }
+              let(:parent_ident) { instance.ident }
 
               it { is_expected.to eq(child_part).and not_eq(part) }
 
-              context "has different ident" do
+              context "when the child has different ident" do
                 let(:child_ident) { "#{super()}new" }
 
                 it { is_expected.to eq nil }
               end
 
-              context "with a part has parent whiches ident is different" do
+              context "whiches ident is different" do
                 let(:parent_ident) { "#{super()}new" }
 
                 it { is_expected.to eq nil }
@@ -76,19 +81,13 @@ RSpec.describe Protod::Proto::Package, type: :model do
                 it_behaves_like :proto_part_find_or_push_when, :not_found_and_already_pushed
               end
 
-              context "with a part don't have parent" do
-                let(:parent) { nil }
-
-                it { is_expected.to eq nil }
-              end
-
-              context "with parent of the part" do
+              context "and the parent given" do
                 let(:part) { super().parent }
 
                 it { is_expected.to eq(instance).and not_eq(parent) }
               end
 
-              context "has grand child" do
+              context "when the child has grand child" do
                 let(:child_part) { super().tap { _1.push(grand_child_part, into: :packages) } }
                 let(:grand_child_part) { build(:proto_package, ident: grand_child_ident) }
                 let(:grand_child_ident) { part.ident }
@@ -103,7 +102,7 @@ RSpec.describe Protod::Proto::Package, type: :model do
                 it_behaves_like :proto_part_find_with_stringified, with_find_or_push_examples: false
                 it_behaves_like :proto_part_find_or_push_when, :found
 
-                context "with a part has parent whiches ident is different" do
+                context "and the part parent whiches ident is different" do
                   let(:parent_ident) { "#{super()}new" }
 
                   it { is_expected.to eq nil }
@@ -114,43 +113,167 @@ RSpec.describe Protod::Proto::Package, type: :model do
             end
           end
         end
+
+        describe "for services" do
+          let(:child) { :service }
+          let(:by) { :ident }
+
+          it { is_expected.to eq nil }
+
+          context "when has child" do
+            let(:instance) { super().tap { _1.push(child_part, into: :services) } }
+            let(:child_part) { build(:proto_service, ident: child_ident) }
+            let(:child_ident) { part.ident }
+
+            it { is_expected.to eq(child_part).and not_eq(part) }
+
+            it_behaves_like :proto_part_find_with_stringified, with_find_or_push_examples: is_frozen ? false : true
+            it_behaves_like :proto_part_find_or_push_when, :found
+
+            context "has different ident" do
+              let(:child_ident) { "#{super()}new" }
+
+              it { is_expected.to eq nil }
+
+              it_behaves_like :proto_part_find_or_push_when, is_frozen ? :not_found_and_frozen : :not_found
+
+              context "with a part has parent" do
+                let(:parent) { build(:proto_package) }
+
+                it_behaves_like :proto_part_find_or_push_when, is_frozen ? :not_found_and_frozen : :not_found
+              end
+            end
+
+            context "by ruby_ident" do
+              let(:by) { :ruby_ident }
+              let(:part) { super().tap { _1.ident = 'Hoge::Fuga' } }
+              let(:child_ident) { 'Hoge::Fuga' }
+
+              it { is_expected.to eq(child_part).and not_eq(part) }
+
+              it_behaves_like :proto_part_find_with_stringified, value: '::Hoge::Fuga', with_find_or_push_examples: false
+            end
+          end
+        end
+
+        describe "for messages" do
+          let(:child) { :message }
+          let(:by) { :ident }
+
+          it { is_expected.to eq nil }
+
+          context "when has child" do
+            let(:instance) { super().tap { _1.push(child_part, into: :messages) } }
+            let(:child_part) { build(:proto_message, ident: child_ident) }
+            let(:child_ident) { part.ident }
+
+            it { is_expected.to eq(child_part).and not_eq(part) }
+
+            it_behaves_like :proto_part_find_with_stringified, with_find_or_push_examples: is_frozen ? false : true
+            it_behaves_like :proto_part_find_or_push_when, :found
+
+            context "has different ident" do
+              let(:child_ident) { "#{super()}new" }
+
+              it { is_expected.to eq nil }
+
+              it_behaves_like :proto_part_find_or_push_when, is_frozen ? :not_found_and_frozen : :not_found
+
+              context "with a part has parent" do
+                let(:parent) { build(:proto_package) }
+
+                it_behaves_like :proto_part_find_or_push_when, is_frozen ? :not_found_and_frozen : :not_found
+              end
+            end
+
+            context "by ruby_ident" do
+              let(:by) { :ruby_ident }
+              let(:part) { super().tap { _1.ident = 'Hoge::Fuga' } }
+              let(:child_ident) { 'Hoge::Fuga' }
+
+              it { is_expected.to eq(child_part).and not_eq(part) }
+
+              it_behaves_like :proto_part_find_with_stringified, value: '::Hoge::Fuga', with_find_or_push_examples: false
+            end
+          end
+        end
       end
     end
   end
 
-#   describe ".find_or_register_package" do
-#     subject { described_class.find_or_register_package('foo.bar.baz', **options) }
-#     let(:options) { {} }
+  describe ".clear!" do
+    subject { described_class.clear! }
 
-#     shared_examples_for :perform_normally do |size: 1|
-#       it do
-#         expect { subject }.to change { described_class.roots.flat_map(&:all_packages).size }.by(size)
+    before { described_class.find_or_register_package('foo.bar.baz') }
 
-#         v = subject
+    it { expect { subject }.to change { described_class.roots.size }.to(0) }
+  end
 
-#         expect(v).to be_a Protod::Proto::Package
-#         expect(v.full_ident).to eq 'foo.bar.baz'
-#         expect(v.parent.ident).to eq 'bar'
-#         expect(v.parent.parent.ident).to eq 'foo'
-#         expect(v.url).to eq options[:url]
-#         expect(v.branch).to eq options[:branch]
-#       end
-#     end
+  describe ".roots" do
+    subject { described_class.roots }
 
-#     it_behaves_like :perform_normally, size: 3
+    it { is_expected.to eq [] }
 
-#     context "with options" do
-#       let(:options) { super().merge(url: 'https://github.com/googleapis/googleapis.git', branch: 'preview') }
+    context "when registered" do
+      before { described_class.find_or_register_package('foo.bar.baz') }
 
-#       it_behaves_like :perform_normally, size: 3
-#     end
+      it do
+        expect(subject.size).to eq 1
+        expect(subject.first).to be_a(Protod::Proto::Package).and have_attributes(ident: 'foo')
+      end
 
-#     context "when same parent package already registered" do
-#       before { described_class.find_or_register_package('foo.bar.piyo') }
+      context "more" do
+        before { described_class.find_or_register_package('hoge.fuga') }
 
-#       it_behaves_like :perform_normally, size: 1
-#     end
-#   end
+        it do
+          expect(subject.size).to eq 2
+          expect(subject.second).to be_a(Protod::Proto::Package).and have_attributes(ident: 'hoge')
+        end
+
+        context "and more but same root" do
+          before { described_class.find_or_register_package('hoge.piyo') }
+
+          it do
+            expect(subject.size).to eq 2
+          end
+        end
+      end
+    end
+  end
+
+  describe ".find_or_register_package" do
+    subject { described_class.find_or_register_package('foo.bar.baz', **options) }
+    let(:options) { {} }
+
+    shared_examples_for :perform_normally do |size: 1|
+      it do
+        expect { subject }.to change { described_class.roots.flat_map(&:all_packages).size }.by(size)
+
+        v = subject
+
+        expect(v).to be_a Protod::Proto::Package
+        expect(v.full_ident).to eq 'foo.bar.baz'
+        expect(v.parent.ident).to eq 'bar'
+        expect(v.parent.parent.ident).to eq 'foo'
+        expect(v.url).to eq options[:url]
+        expect(v.branch).to eq options[:branch]
+      end
+    end
+
+    it_behaves_like :perform_normally, size: 3
+
+    context "with options" do
+      let(:options) { super().merge(url: 'https://github.com/googleapis/googleapis.git', branch: 'preview') }
+
+      it_behaves_like :perform_normally, size: 3
+    end
+
+    context "when same parent package already registered" do
+      before { described_class.find_or_register_package('foo.bar.piyo') }
+
+      it_behaves_like :perform_normally, size: 1
+    end
+  end
 
 #   describe "#full_ident" do
 #     subject { instance.full_ident }

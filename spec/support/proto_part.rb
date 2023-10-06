@@ -150,12 +150,12 @@ RSpec.shared_examples_for :proto_part_find_with_unsupported do |children: []|
   end
 end
 
-RSpec.shared_examples_for :proto_part_find_with_stringified do |with_find_or_push_examples: true|
+RSpec.shared_examples_for :proto_part_find_with_stringified do |value: nil, with_find_or_push_examples: true|
   subject { instance.find(stringified_part, by: by, **options) }
   let(:options) { super().merge(as: part.class.name.split('::').last.underscore.to_sym ) }
 
   context "with the part as stringified value" do
-    let(:stringified_part) { part.public_send(by) }
+    let(:stringified_part) { value || part.public_send(by) }
 
     it { is_expected.to be_a(part.class).and have_attributes(by.to_sym => stringified_part.to_s) }
 
@@ -191,15 +191,24 @@ RSpec.shared_examples_for :proto_part_find_or_push_when do |the_case|
       
       expect(subject).to be_a(part.class).and not_eq(part).and have_attributes(by.to_sym => part.public_send(by))
     end
-  when :not_found
+  when :not_found, :not_found_and_frozen
     it do
       if part.parent
         expect { subject }.to raise_error(ArgumentError, /Can't push already bound/)
                                 .and not_change { instance.public_send(into).size }
+      elsif the_case == :not_found_and_frozen
+        expect { subject }.to raise_error(FrozenError)
+                                .and not_change { instance.public_send(into).size }
       else
         expect { subject }.to change { instance.public_send(into).size }.by(1)
 
-        expect(subject).to eq(part).and eq(instance.public_send(into).last)
+        attr_ex = if find_or_push_part.is_a?(part.class)
+                    eq(find_or_push_part)
+                  else
+                    have_attributes(by.to_sym => find_or_push_part.to_s)
+                  end
+
+        expect(subject).to eq(instance.public_send(into).last).and attr_ex
       end
     end
   when :not_found_and_already_pushed
