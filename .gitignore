@@ -6,6 +6,7 @@
 /spec/reports/
 /tmp/
 /vendor/bundle/
+/vendor/bundle_bin/
 
 # rspec failure tracking
 .rspec_status
