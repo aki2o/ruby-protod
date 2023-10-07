@@ -53,6 +53,15 @@ FactoryBot.define do
   end
 
   factory :proto_procedure, parent: :proto_part, class: Protod::Proto::Procedure do
+    singleton { [true, false].sample }
+
+    trait :singleton do
+      singleton { true }
+    end
+
+    trait :instance do
+      singleton { false }
+    end
   end
 
   factory :proto_message, parent: :proto_part, class: Protod::Proto::Message do

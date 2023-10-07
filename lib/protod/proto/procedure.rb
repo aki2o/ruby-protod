@@ -16,7 +16,7 @@ class Protod
       def ruby_ident
         raise ArgumentError, "Not set parent" unless parent
 
-        Protod::RubyIdent.new(const_name: parent.ruby_ident, method_name: ruby_method_name, singleton: singleton)
+        Protod::RubyIdent.new(const_name: parent.ruby_ident, method_name: ruby_method_name, singleton: singleton).to_s
       end
 
       def ruby_method_name

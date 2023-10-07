@@ -16,6 +16,8 @@ class Protod
       end
 
       def pb_const
+        return unless parent
+
         parent.pb_const.const_get(ident).const_get('Service')
       end
 

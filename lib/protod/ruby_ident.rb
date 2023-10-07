@@ -11,7 +11,7 @@ class Protod
       def build_from(string)
         return if string.blank?
 
-        string = string.gsub('__', '::')
+        string = string.to_s.gsub('__', '::')
 
         const_name, method_name, singleton = case
                                              when string.include?('.') 
@@ -39,7 +39,12 @@ class Protod
     end
 
     def ==(other)
-      to_s == other.to_s
+      case other
+      when ::String
+        to_s == other
+      when self.class
+        to_s == other.to_s
+      end
     end
 
     def to_s
