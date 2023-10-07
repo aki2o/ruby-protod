@@ -170,6 +170,8 @@ class Protod
         fields.each do |f|
           case f
           when Protod::Proto::Field
+            next if f.void?
+
             f.index = index
 
             index = f.index + 1

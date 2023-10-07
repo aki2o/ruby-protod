@@ -41,6 +41,6 @@ end
 
 Dir[Pathname(__dir__).join("support/**/*.rb")].each { |f| require f }
 
-RSpec.shared_context :setup_builtin_interpreters do
-  before { Protod::Interpreter::Builtin.setup }
+RSpec.shared_context :load_configuration do
+  before { Protod.configuration }
 end

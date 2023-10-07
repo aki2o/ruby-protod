@@ -18,7 +18,7 @@ RSpec.describe Protod::Proto::Field, type: :model do
   #   end
 
   #   context "after setup interpreters" do
-  #     include_context :setup_builtin_interpreters
+  #     include_context :load_configuration
 
   #     it_behaves_like :build_instance
 
@@ -41,7 +41,7 @@ RSpec.describe Protod::Proto::Field, type: :model do
   #     let(:type) { (Protod::Interpreter.all - void_types).sample }
   #     let(:void_types) { %w[::RBS::Types::Bases::Void ::RBS::Types::Bases::Nil] }
 
-  #     include_context :setup_builtin_interpreters
+  #     include_context :load_configuration
 
   #     it { is_expected.to eq false }
 
@@ -64,7 +64,7 @@ RSpec.describe Protod::Proto::Field, type: :model do
   #     let(:attributes) { super().merge(interpreter: Protod::Interpreter.find_by(type)) }
   #     let(:type) { 'Integer' }
 
-  #     include_context :setup_builtin_interpreters
+  #     include_context :load_configuration
 
   #     it { is_expected.to eq "int64 f1;" }
 

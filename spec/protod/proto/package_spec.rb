@@ -255,305 +255,364 @@ RSpec.describe Protod::Proto::Package, type: :model do
         expect(v.full_ident).to eq 'foo.bar.baz'
         expect(v.parent.ident).to eq 'bar'
         expect(v.parent.parent.ident).to eq 'foo'
-        expect(v.url).to eq options[:url]
-        expect(v.branch).to eq options[:branch]
+        expect(v).to have_attributes(**expected_options)
       end
     end
+    let(:expected_options) { %i[url branch for_ruby for_java].index_with { options[_1] } }
 
     it_behaves_like :perform_normally, size: 3
-
-    context "with options" do
-      let(:options) { super().merge(url: 'https://github.com/googleapis/googleapis.git', branch: 'preview') }
-
-      it_behaves_like :perform_normally, size: 3
-    end
 
     context "when same parent package already registered" do
       before { described_class.find_or_register_package('foo.bar.piyo') }
 
       it_behaves_like :perform_normally, size: 1
     end
+
+    context "with options" do
+      let(:options) do
+        super().merge(
+          url: 'https://github.com/googleapis/googleapis.git',
+          branch: 'preview',
+          for_ruby: 'Bar::Baz',
+          for_java: 'bar.baz'
+        )
+      end
+
+      it_behaves_like :perform_normally, size: 3
+    end
+
+    context "when parent has options" do
+      before do
+        described_class.find_or_register_package(
+          'foo.bar',
+          url: 'https://github.com/googleapis/googleapis.git',
+          branch: 'preview',
+          for_ruby: 'Hoge::Fuga',
+          for_java: 'hoge.fuga'
+        )
+      end
+
+      let(:expected_options) { { url: nil, branch: nil, for_ruby: 'Hoge::Fuga::Baz', for_java: 'hoge.fuga.baz' } }
+
+      it_behaves_like :perform_normally, size: 1
+    end
   end
 
-#   describe "#full_ident" do
-#     subject { instance.full_ident }
-#     let(:instance) { described_class.new(**{ parent: parent, ident: ident }.compact) }
-#     let(:parent) { Protod::Proto::Package.new(ident: parent_ident) if parent_ident }
-
-#     where(:parent_ident, :ident, :expected_value) do
-#       [
-#         [nil, nil, nil],
-#         [nil, 'foo', 'foo'],
-#         ['foo', nil, nil],
-#         ['foo', 'bar', 'foo.bar'],
-#       ]
-#     end
-
-#     with_them do
-#       it { is_expected.to eq expected_value }
-#     end
-#   end
-
-#   describe "#all_packages" do
-#     subject { instance.all_packages }
-#     let(:instance) { described_class.new }
-
-#     it { is_expected.to contain_exactly(instance) }
-
-#     context "having packages" do
-#       before { instance.packages.push(c1, c2) }
-#       let(:c1) { described_class.new(ident: 'c1') }
-#       let(:c2) { described_class.new(ident: 'c2') }
-
-#       it { is_expected.to contain_exactly(instance, c1, c2) }
-
-#       context "has packages" do
-#         before do
-#           c1.packages.push(g1, g2)
-#           c2.packages.push(g3, g4)
-#         end
-#         let(:g1) { described_class.new(ident: 'g1') }
-#         let(:g2) { described_class.new(ident: 'g2') }
-#         let(:g3) { described_class.new(ident: 'g3') }
-#         let(:g4) { described_class.new(ident: 'g4') }
-
-#         it { is_expected.to contain_exactly(instance, c1, g1, g2, c2, g3, g4) }
-#       end
-#     end
-#   end
-
-#   describe "#empty?" do
-#     subject { instance.empty? }
-#     let(:instance) { described_class.new }
-
-#     it { is_expected.to eq true }
-
-#     context "having package" do
-#       before { instance.packages.push(described_class.new) }
-
-#       it { is_expected.to eq true }
-#     end
-
-#     context "having service" do
-#       before { instance.services.push(Protod::Proto::Service.new) }
-
-#       it { is_expected.to eq false }
-#     end
+  describe "#proto_path" do
+    subject { instance.proto_path }
+    let(:instance) { described_class.new(**{ parent: parent, ident: ident }.compact) }
+    let(:parent) { Protod::Proto::Package.new(ident: parent_ident) if parent_ident }
+
+    where(:parent_ident, :ident, :expected_value) do
+      [
+        [nil, nil, nil],
+        [nil, 'foo', 'foo.proto'],
+        ['foo', nil, nil],
+        ['foo', 'bar', 'foo/bar.proto'],
+      ]
+    end
+
+    with_them do
+      it { is_expected.to eq expected_value }
+    end
+  end
+
+  describe "#full_ident" do
+    subject { instance.full_ident }
+    let(:instance) { described_class.new(**{ parent: parent, ident: ident }.compact) }
+    let(:parent) { Protod::Proto::Package.new(ident: parent_ident) if parent_ident }
+
+    where(:parent_ident, :ident, :expected_value) do
+      [
+        [nil, nil, nil],
+        [nil, 'foo', 'foo'],
+        ['foo', nil, nil],
+        ['foo', 'bar', 'foo.bar'],
+      ]
+    end
+
+    with_them do
+      it { is_expected.to eq expected_value }
+    end
+  end
+
+  describe "#pb_const" do
+    subject { instance.pb_const }
+    let(:instance) { described_class.find_or_register_package('foo.bar.baz', **options) }
+    let(:options) { {} }
+
+    let!(:expected_const) { stub_const(expected_const_name, Class.new) }
+    let(:expected_const_name) { 'Foo::Bar::Baz' }
+
+    it { is_expected.to eq expected_const }
+
+    context "with for_ruby" do
+      let(:options) { super().merge(for_ruby: 'Hoge::Fuga') }
+
+      let(:expected_const_name) { 'Hoge::Fuga' }
+
+      it { is_expected.to eq expected_const }
+    end
+  end
+
+  describe "#all_packages" do
+    subject { instance.all_packages }
+    let(:instance) { described_class.new }
+
+    it { is_expected.to contain_exactly(instance) }
+
+    context "having packages" do
+      before { instance.packages.push(c1, c2) }
+      let(:c1) { described_class.new(ident: 'c1') }
+      let(:c2) { described_class.new(ident: 'c2') }
+
+      it { is_expected.to contain_exactly(instance, c1, c2) }
+
+      context "has packages" do
+        before do
+          c1.packages.push(g1, g2)
+          c2.packages.push(g3, g4)
+        end
+        let(:g1) { described_class.new(ident: 'g1') }
+        let(:g2) { described_class.new(ident: 'g2') }
+        let(:g3) { described_class.new(ident: 'g3') }
+        let(:g4) { described_class.new(ident: 'g4') }
+
+        it { is_expected.to contain_exactly(instance, c1, g1, g2, c2, g3, g4) }
+      end
+    end
+  end
+
+  describe "#empty?" do
+    subject { instance.empty? }
+    let(:instance) { described_class.new }
+
+    it { is_expected.to eq true }
+
+    context "having package" do
+      before { instance.packages.push(described_class.new) }
+
+      it { is_expected.to eq true }
+    end
 
-#     context "having message" do
-#       before { instance.messages.push(Protod::Proto::Message.new) }
+    context "having service" do
+      before { instance.services.push(Protod::Proto::Service.new) }
+
+      it { is_expected.to eq false }
+    end
 
-#       it { is_expected.to eq false }
-#     end
-#   end
-
-#   describe "#external?" do
-#     subject { instance.external? }
-#     let(:instance) { described_class.new }
-
-#     it { is_expected.to eq false }
-
-#     context "having url" do
-#       before { instance.url = 'https://github.com/googleapis/googleapis.git' }
-
-#       it { is_expected.to eq true }
-#     end
-#   end
-
-#   describe "#to_proto" do
-#     subject { instance.to_proto }
-#     let(:instance) { described_class.new(ident: 'foo') }
-
-#     shared_examples_for :make_proto do
-#       it { is_expected.to eq expected_value }
-#     end
-#     let(:expected_value) do
-#       <<~EOS
-#         syntax = "proto3";
+    context "having message" do
+      before { instance.messages.push(Protod::Proto::Message.new) }
 
-#         package #{expected_package_ident};#{expected_import}
-#       EOS
-#     end
-#     let(:expected_package_ident) { 'foo' }
-#     let(:expected_import) { '' }
+      it { is_expected.to eq false }
+    end
+  end
 
-#     it_behaves_like :make_proto
+  describe "#external?" do
+    subject { instance.external? }
+    let(:instance) { described_class.new }
 
-#     context "with parent" do
-#       before { instance.parent = Protod::Proto::Package.new(parent: Protod::Proto::Package.new(ident: 'baz'), ident: 'bar') }
+    it { is_expected.to eq false }
 
-#       let(:expected_package_ident) { 'baz.bar.foo' }
+    context "having url" do
+      before { instance.url = 'https://github.com/googleapis/googleapis.git' }
 
-#       it_behaves_like :make_proto
-#     end
+      it { is_expected.to eq true }
+    end
+  end
 
-#     context "with messages" do
-#       before { instance.messages.push(m1, m2) }
-#       let(:m1) { Protod::Proto::Message.new(parent: instance, ident: '::Hoge::Fuga') }
-#       let(:m2) { Protod::Proto::Message.new(parent: instance, ident: 'Bar__Baz') }
+  describe "#to_proto" do
+    subject { instance.freeze.to_proto }
+    let(:instance) { described_class.new(ident: 'foo') }
 
-#       let(:expected_value) do
-#         <<~EOS
-#           #{super()}
-#           message Hoge__Fuga {#{expected_message_body}}
+    shared_examples_for :make_proto do
+      it { is_expected.to eq expected_value }
+    end
+    let(:expected_value) do
+      <<~EOS
+        syntax = "proto3";
 
-#           message Bar__Baz {}
-#         EOS
-#       end
-#       let(:expected_message_body) { '' }
+        package #{expected_package_ident};#{expected_import}
+      EOS
+    end
+    let(:expected_package_ident) { 'foo' }
+    let(:expected_import) { '' }
 
-#       it_behaves_like :make_proto
+    it_behaves_like :make_proto
 
-#       context "has fields" do
-#         include_context :setup_builtin_interpreters
+    context "with parent" do
+      before { described_class.find_or_register_package('baz.bar').push(instance, into: :packages) }
 
-#         before do
-#           interpreter_setup.call
+      let(:expected_package_ident) { 'baz.bar.foo' }
 
-#           m1.fields.push(
-#             Protod::Proto::Field.build_from(t1, parent: m1, ident: 'f1'),
-#             Protod::Proto::Field.build_from(t2, parent: m1, ident: 'f2')
-#           )
-#         end
-#         let(:interpreter_setup) { -> {} }
-#         let(:t1) { 'Integer' }
-#         let(:t2) { 'String' }
+      it_behaves_like :make_proto
+    end
 
-#         let(:expected_message_body) do
-#           <<EOS
+    context "with messages" do
+      before { [m1, m2].each { instance.push(_1, into: :messages) } }
+      let(:m1) { Protod::Proto::Message.new(ident: '::Hoge::Fuga') }
+      let(:m2) { Protod::Proto::Message.new(ident: 'Bar__Baz') }
 
-#   int64 f1 = 1;
-#   string f2 = 2;
-# EOS
-#         end
+      let(:expected_value) do
+        <<~EOS
+          #{super()}
+          message Hoge__Fuga {#{expected_message_body}}
 
-#         it_behaves_like :make_proto
+          message Bar__Baz {}
+        EOS
+      end
+      let(:expected_message_body) { '' }
 
-#         context "includes void" do
-#           let(:t1) { %w[RBS::Types::Bases::Void RBS::Types::Bases::Nil].sample }
+      it_behaves_like :make_proto
 
-#           let(:expected_message_body) do
-#             <<EOS
+      context "has fields" do
+        include_context :load_configuration
 
-#   string f2 = 1;
-# EOS
-#           end
+        before do
+          interpreter_setup.call
 
-#           it_behaves_like :make_proto
-#         end
+          m1.push(Protod::Proto::Field.build_from(t1, ident: 'f1'), into: :fields)
+          m1.push(Protod::Proto::Field.build_from(t2, ident: 'f2'), into: :fields)
+        end
+        let(:interpreter_setup) { -> {} }
+        let(:t1) { 'Integer' }
+        let(:t2) { 'String' }
 
-#         context "has package" do
-#           let(:interpreter_setup) do
-#             -> do
-#               stub_const('::Hoge::Piyo', Class.new)
+        let(:expected_message_body) do
+          <<EOS
 
-#               described_class.find_or_register_package('abc.xyz').tap do
-#                 Protod::Interpreter.register_for('Hoge::Piyo', parent: _1, path: proto_path)
-#               end
-#             end
-#           end
-#           let(:proto_path) { nil }
+  sint64 f1 = 1;
+  string f2 = 2;
+EOS
+        end
 
-#           let(:t1) { '::Date' }
-#           let(:t2) { '::Hoge::Piyo' }
+        it_behaves_like :make_proto
 
-#           let(:expected_message_body) do
-#             <<EOS
+        context "includes void" do
+          let(:t1) { %w[RBS::Types::Bases::Void RBS::Types::Bases::Nil].sample }
 
-#   google.type.Date f1 = 1;
-#   abc.xyz.Hoge__Piyo f2 = 2;
-# EOS
-#           end
+          let(:expected_message_body) do
+            <<EOS
 
-#           let(:expected_import) do
-#             <<~EOS.chomp
+  string f2 = 1;
+EOS
+          end
 
+          it_behaves_like :make_proto
+        end
 
-#               import "abc/xyz.proto";
-#               import "google/type/date.proto";
-#             EOS
-#           end
+        context "has package" do
+          let(:interpreter_setup) do
+            -> do
+              stub_const('::Hoge::Piyo', Class.new)
 
-#           it_behaves_like :make_proto
+              described_class.find_or_register_package('abc.xyz').tap do
+                Protod::Interpreter.register_for('Hoge::Piyo', parent: _1, path: proto_path)
+              end
+            end
+          end
+          let(:proto_path) { nil }
 
-#           context "with path" do
-#             let(:proto_path) { 'hoge/piyo.proto' }
+          let(:t1) { '::Date' }
+          let(:t2) { '::Hoge::Piyo' }
 
-#             let(:expected_import) do
-#               <<~EOS.chomp
+          let(:expected_message_body) do
+            <<EOS
 
+  google.type.Date f1 = 1;
+  abc.xyz.Hoge__Piyo f2 = 2;
+EOS
+          end
 
-#                 import "google/type/date.proto";
-#                 import "hoge/piyo.proto";
-#               EOS
-#             end
+          let(:expected_import) do
+            <<~EOS.chomp
 
-#             it_behaves_like :make_proto
 
-#             context "is same path" do
-#               let(:proto_path) { 'google/type/date.proto' }
+              import "abc/xyz.proto";
+              import "google/type/date.proto";
+            EOS
+          end
 
-#               let(:expected_import) do
-#                 <<~EOS.chomp
+          it_behaves_like :make_proto
 
+          context "with path" do
+            let(:proto_path) { 'hoge/piyo.proto' }
 
-#                   import "google/type/date.proto";
-#                 EOS
-#               end
+            let(:expected_import) do
+              <<~EOS.chomp
 
-#               it_behaves_like :make_proto
-#             end
-#           end
-#         end
-#       end
 
-#       context "and services" do
-#         before { instance.services.push(s1, s2) }
-#         let(:s1) { Protod::Proto::Service.new(parent: instance, ident: '::S1::S2') }
-#         let(:s2) { Protod::Proto::Service.new(parent: instance, ident: 'S3__S4') }
+                import "google/type/date.proto";
+                import "hoge/piyo.proto";
+              EOS
+            end
 
-#         let(:expected_value) do
-#           <<~EOS
-#             #{super()}
-#             service S1__S2 {#{expected_service_body}}
+            it_behaves_like :make_proto
 
-#             service S3__S4 {}
-#           EOS
-#         end
-#         let(:expected_service_body) { '' }
+            context "is same path" do
+              let(:proto_path) { 'google/type/date.proto' }
 
-#         it_behaves_like :make_proto
+              let(:expected_import) do
+                <<~EOS.chomp
 
-#         context "has procedures" do
-#           before { s1.procedures.push(p1, p2) }
-#           let(:p1) { Protod::Proto::Procedure.new(parent: s1, ident: 'hello_world', has_request: has_request, has_response: false) }
-#           let(:p2) { Protod::Proto::Procedure.new(parent: s1, ident: 'rest_in_peace', has_request: false, has_response: has_response) }
-#           let(:has_request) { false }
-#           let(:has_response) { false }
 
-#           let(:expected_service_body) do
-#             <<EOS
+                  import "google/type/date.proto";
+                EOS
+              end
 
-#   rpc HelloWorld (#{expected_request_ident}) returns ();
-#   rpc RestInPeace () returns (#{expected_response_ident});
-# EOS
-#           end
-#           let(:expected_request_ident) { '' }
-#           let(:expected_response_ident) { '' }
+              it_behaves_like :make_proto
+            end
+          end
+        end
+      end
 
-#           it_behaves_like :make_proto
+      context "and services" do
+        before { [s1, s2].each { instance.push(_1, into: :services) } }
+        let(:s1) { Protod::Proto::Service.new(ident: '::S1::S2') }
+        let(:s2) { Protod::Proto::Service.new(ident: 'S3__S4') }
 
-#           context "has request, response" do
-#             let(:has_request) { true }
-#             let(:has_response) { true }
+        let(:expected_value) do
+          <<~EOS
+            #{super()}
+            service S1__S2 {#{expected_service_body}}
 
-#             let(:expected_request_ident) { 'S1__S2__HelloWorldRequest' }
-#             let(:expected_response_ident) { 'S1__S2__RestInPeaceResponse' }
+            service S3__S4 {}
+          EOS
+        end
+        let(:expected_service_body) { '' }
 
-#             it_behaves_like :make_proto
-#           end
-#         end
-#       end
-#     end
-#   end
+        it_behaves_like :make_proto
+
+        context "has procedures" do
+          before { [p1, p2].each { s1.push(_1, into: :procedures) } }
+          let(:p1) { Protod::Proto::Procedure.new(ident: 'hello_world', has_request: has_request, has_response: false) }
+          let(:p2) { Protod::Proto::Procedure.new(ident: 'rest_in_peace', has_request: false, has_response: has_response) }
+          let(:has_request) { false }
+          let(:has_response) { false }
+
+          let(:expected_service_body) do
+            <<EOS
+
+  rpc HelloWorld (#{expected_request_ident}) returns ();
+  rpc RestInPeace () returns (#{expected_response_ident});
+EOS
+          end
+          let(:expected_request_ident) { '' }
+          let(:expected_response_ident) { '' }
+
+          it_behaves_like :make_proto
+
+          context "has request, response" do
+            let(:has_request) { true }
+            let(:has_response) { true }
+
+            let(:expected_request_ident) { 'HelloWorldRequest' }
+            let(:expected_response_ident) { 'RestInPeaceResponse' }
+
+            it_behaves_like :make_proto
+          end
+        end
+      end
+    end
+  end
 end

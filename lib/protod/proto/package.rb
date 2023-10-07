@@ -58,7 +58,7 @@ class Protod
       end
 
       def proto_path
-        full_ident.gsub('.', '/').then { "#{_1}.proto" }
+        full_ident&.gsub('.', '/')&.then { "#{_1}.proto" }
       end
 
       def full_ident
@@ -75,6 +75,11 @@ class Protod
 
       def empty?
         services.empty? && messages.empty?
+      end
+
+      # @override
+      def blank?
+        false
       end
 
       def external?
