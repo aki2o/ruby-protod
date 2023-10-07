@@ -564,6 +564,62 @@ EOS
             end
           end
         end
+
+        context "and oneof" do
+          before { m1.push(o1, into: :fields) }
+          let(:o1) do
+            Protod::Proto::Oneof.new(ident: 'o1').tap do
+              _1.push(Protod::Proto::Field.build_from(TrueClass, ident: 'c1'), into: :fields)
+              _1.push(Protod::Proto::Field.build_from(TrueClass, ident: 'c2'), into: :fields)
+            end
+          end
+
+          let(:expected_message_body) do
+            <<EOS
+#{super().chomp}
+  oneof o1 {
+    bool c1 = 3;
+    bool c2 = 4;
+  }
+EOS
+          end
+
+          it_behaves_like :make_proto
+
+          context "and more field" do
+            before { m1.push(Protod::Proto::Field.build_from(TrueClass, ident: 'f3'), into: :fields) }
+
+            let(:expected_message_body) do
+              <<EOS
+#{super().chomp}
+  bool f3 = 5;
+EOS
+            end
+
+            it_behaves_like :make_proto
+          end
+        end
+
+        context "and nested message" do
+          before { m1.push(c1, into: :messages) }
+          let(:c1) do
+            Protod::Proto::Message.new(ident: 'Piyo').tap do
+              _1.push(Protod::Proto::Field.build_from(TrueClass, ident: 'c1'), into: :fields)
+            end
+          end
+
+          let(:expected_message_body) do
+            <<EOS
+
+  message Piyo {
+    bool c1 = 1;
+  }
+#{super().chomp}
+EOS
+          end
+
+          it_behaves_like :make_proto
+        end
       end
 
       context "and services" do
@@ -585,10 +641,12 @@ EOS
 
         context "has procedures" do
           before { [p1, p2].each { s1.push(_1, into: :procedures) } }
-          let(:p1) { Protod::Proto::Procedure.new(ident: 'hello_world', has_request: has_request, has_response: false) }
-          let(:p2) { Protod::Proto::Procedure.new(ident: 'rest_in_peace', has_request: false, has_response: has_response) }
+          let(:p1) { Protod::Proto::Procedure.new(ident: 'hello_world', has_request: has_request, has_response: false, streaming_request: streaming_request) }
+          let(:p2) { Protod::Proto::Procedure.new(ident: 'rest_in_peace', has_request: false, has_response: has_response, streaming_response: streaming_response) }
           let(:has_request) { false }
           let(:has_response) { false }
+          let(:streaming_request) { false }
+          let(:streaming_response) { false }
 
           let(:expected_service_body) do
             <<EOS
@@ -610,6 +668,16 @@ EOS
             let(:expected_response_ident) { 'RestInPeaceResponse' }
 
             it_behaves_like :make_proto
+
+            context "as stream" do
+              let(:streaming_request) { true }
+              let(:streaming_response) { true }
+
+              let(:expected_request_ident) { "stream #{super()}" }
+              let(:expected_response_ident) { "stream #{super()}" }
+
+              it_behaves_like :make_proto
+            end
           end
         end
       end
