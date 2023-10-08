@@ -3,7 +3,7 @@
 class Protod
   module Proto
     class Package < Part
-      include Findable
+      include Parentable
       include FieldCollectable
       include InterpreterBindable
 

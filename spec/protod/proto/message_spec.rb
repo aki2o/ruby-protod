@@ -83,7 +83,7 @@ RSpec.describe Protod::Proto::Message, type: :model do
       context "on #{is_frozen ? 'frozen' : 'not frozen'}" do
         before { instance.freeze if is_frozen }
 
-        describe "for messages" do
+        describe "for message" do
           let(:child) { :message }
 
           it { is_expected.to eq nil }
@@ -124,7 +124,7 @@ RSpec.describe Protod::Proto::Message, type: :model do
           end
         end
 
-        describe "for fields" do
+        describe "for field" do
           let(:child) { :field }
 
           it { is_expected.to eq nil }
@@ -154,17 +154,72 @@ RSpec.describe Protod::Proto::Message, type: :model do
             end
           end
         end
+
+        describe "for oneof" do
+          let(:child) { :oneof }
+
+          it { is_expected.to eq nil }
+
+          context "when has child" do
+            let(:instance) { super().tap { _1.push(child_part, into: :fields) } }
+            let(:child_part) { build(:proto_oneof, ident: child_ident) }
+            let(:child_ident) { part.ident }
+
+            it { is_expected.to eq(child_part).and not_eq(part) }
+
+            it_behaves_like :proto_part_find_with_stringified, with_find_or_push_examples: is_frozen ? false : { into: :fields }
+            it_behaves_like :proto_part_find_or_push_when, :found do
+              let(:into) { :fields }
+            end
+
+            context "has different ident" do
+              let(:child_ident) { "#{super()}new" }
+
+              it { is_expected.to eq nil }
+
+              it_behaves_like :proto_part_find_or_push_when, is_frozen ? :not_found_and_frozen : :not_found do
+                let(:into) { :fields }
+              end
+
+              context "with a part has parent" do
+                let(:parent) { build(:proto_message) }
+
+                it_behaves_like :proto_part_find_or_push_when, is_frozen ? :not_found_and_frozen : :not_found do
+                  let(:into) { :fields }
+                end
+              end
+            end
+          end
+        end
       end
     end
   end
 
-  # describe "#ruby_ident" do
-  #   subject { instance.ruby_ident }
-  #   let(:instance) { described_class.new(ident: ident) }
-  #   let(:ident) { Faker::Name.last_name }
+  describe "#ruby_ident" do
+    subject { instance.ruby_ident }
+    let(:instance) { described_class.new(ident: 'Hoge::Fuga') }
 
-  #   before { allow(Protod).to receive(:const_name_from).with(ident).and_return(mock_ident) }
+    it { is_expected.to eq '::Hoge::Fuga' }
+  end
 
-  #   it { is_expected.to eq mock_ident }
-  # end
+  describe "#full_ident" do
+    subject { instance.full_ident }
+    let(:instance) { build(:proto_message, parent: parent) }
+    let(:parent) { nil }
+
+    it { is_expected.to eq instance.ident }
+
+    context "having parent" do
+      let(:parent) { build([:proto_package, :proto_message].sample, parent: grand_parent) }
+      let(:grand_parent) { nil }
+
+      it { is_expected.to eq "#{parent.ident}.#{instance.ident}" }
+
+      context "has parent" do
+        let(:grand_parent) { Protod.find_or_register_package('foo.bar.baz') }
+
+        it { is_expected.to eq "foo.bar.baz.#{parent.ident}.#{instance.ident}" }
+      end
+    end
+  end
 end

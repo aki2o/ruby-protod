@@ -3,7 +3,7 @@
 class Protod
   module Proto
     class Oneof < Part
-      include Findable
+      include Parentable
       include FieldNumeringable
 
       attribute :fields, default: -> { [] }

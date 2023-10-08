@@ -3,7 +3,7 @@
 class Protod
   module Proto
     class Service < Part
-      include Findable
+      include Parentable
 
       attribute :procedures, default: -> { [] }
 

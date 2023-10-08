@@ -46,7 +46,7 @@ RSpec.describe Protod::Proto::Package, type: :model do
       context "on #{is_frozen ? 'frozen' : 'not frozen'}" do
         before { instance.freeze if is_frozen }
 
-        describe "for packages" do
+        describe "for package" do
           let(:child) { :package }
           let(:by) { :full_ident }
 
@@ -114,7 +114,7 @@ RSpec.describe Protod::Proto::Package, type: :model do
           end
         end
 
-        describe "for services" do
+        describe "for service" do
           let(:child) { :service }
           let(:by) { :ident }
 
@@ -156,7 +156,7 @@ RSpec.describe Protod::Proto::Package, type: :model do
           end
         end
 
-        describe "for messages" do
+        describe "for message" do
           let(:child) { :message }
           let(:by) { :ident }
 

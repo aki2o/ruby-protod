@@ -26,23 +26,6 @@ class Protod
         parent.is_a?(part_const) ? parent : parent&.ancestor_as(part_const)
       end
 
-      def push(part, into:, ignore: false)
-        already_pushed = has?(part, in_the: into)
-
-        raise ArgumentError, "Can't push already present #{part.ident} in #{ident}" if already_pushed && ignore.!
-        raise ArgumentError, "Can't push already bound to #{part.parent.ident} in #{ident}" if part.parent
-
-        part.assign_attributes(parent: self)
-
-        public_send(into).push(part) unless already_pushed
-
-        part
-      end
-
-      def has?(part, in_the:)
-        public_send(in_the).any? { _1.ident == part.ident }
-      end
-
       def to_proto
         raise NotImplementedError, "Not defined #{self.class.name}##{__method__}"
       end
@@ -68,7 +51,7 @@ class Protod
       end
     end
 
-    module Findable
+    module Parentable
       extend ActiveSupport::Concern
 
       class_methods do
@@ -94,48 +77,74 @@ class Protod
       included do
         class_attribute :_findable_keys_for
         class_attribute :_findable_body_for
+      end
 
-        def find(part, by:, as: nil)
-          by    = by.to_s
-          value = case part
-                  when ::String
-                    part
-                  when ::Symbol
-                    part.to_s
-                  else
-                    part.public_send(by)
-                  end
-          part  = as ? "Protod::Proto::#{as.to_s.classify}".safe_constantize&.allocate : part
-          keys  = _findable_keys_for.fetch(part.class.name, nil)
-          body  = _findable_body_for.fetch(part.class.name, nil)
+      # Find the part
+      #
+      # @note The target is not descendants but children. For example, if you do `package.find(...)`, the result can
+      #       come from only `package.messages` not including `package.messages.first.messages` 
+      def find(part, by:, as: nil)
+        by    = by.to_s
+        value = case part
+                when ::String
+                  part
+                when ::Symbol
+                  part.to_s
+                else
+                  part.public_send(by)
+                end
+        part  = as ? "Protod::Proto::#{as.to_s.classify}".safe_constantize&.allocate : part
+        keys  = _findable_keys_for.fetch(part.class.name, nil)
+        body  = _findable_body_for.fetch(part.class.name, nil)
 
-          raise ArgumentError, "Unsupported as : #{as}" if keys.blank? && as
-          raise ArgumentError, "Unsupported part : #{part.class.name}" if keys.blank?
-          raise ArgumentError, "Unsupported by : #{by}. #{keys.join(', ')} are available" unless by.in?(keys)
-          raise NotImplementedError, "Sorry, this is bug forgetting to implement for #{part.class.name} at #{self.class.name}" unless body
+        raise ArgumentError, "Unsupported as : #{as}" if keys.blank? && as
+        raise ArgumentError, "Unsupported part : #{part.class.name}" if keys.blank?
+        raise ArgumentError, "Unsupported by : #{by}. #{keys.join(', ')} are available" unless by.in?(keys)
+        raise NotImplementedError, "Sorry, this is bug forgetting to implement for #{part.class.name} at #{self.class.name}" unless body
 
-          instance_exec(by, value, &body)
-        end
+        instance_exec(by, value, &body)
+      end
 
-        def find_or_push(part, into:, by:, as: nil, ignore: false, &body)
-          new_part = if part.is_a?(::String)
-                       c = if as
-                             "Protod::Proto::#{as.to_s.classify}".safe_constantize
-                           else
-                             "Protod::Proto::#{into.to_s.classify}".constantize
-                           end
+      # @return [Protod::Proto::Part] the given part
+      def push(part, into:)
+        already_pushed = has?(part, in_the: into)
 
-                       raise ArgumentError, "Unsupported as : #{as}" unless c
+        raise ArgumentError, "Can't push already present #{part.ident} in #{ident}" if already_pushed
+        raise ArgumentError, "Can't push already bound to #{part.parent.ident} in #{ident}" if part.parent
 
-                       c.new(by.to_sym => part)
-                     else
-                       part
-                     end
+        part.assign_attributes(parent: self)
 
-          as = part.is_a?(::String) ? new_part.class.name.split('::').last.underscore : nil
+        public_send(into).push(part) unless already_pushed
 
-          find(part, by: by, as: as) || push(new_part, into: into, ignore: ignore).tap { body&.call(_1) }
-        end
+        part
+      end
+
+      # Checking the part has been already pushed
+      def has?(part, in_the:)
+        public_send(in_the).any? { _1.ident == part.ident }
+      end
+
+      # @note There is posibility to raise error on pushing if not found.
+      #       That's because, for example, #has? might return true even if #find returns nil.
+      # @see #find, #has?
+      def find_or_push(part, into:, by:, as: nil, &body)
+        new_part = if part.is_a?(::String)
+                     c = if as
+                           "Protod::Proto::#{as.to_s.classify}".safe_constantize
+                         else
+                           "Protod::Proto::#{into.to_s.classify}".constantize
+                         end
+
+                     raise ArgumentError, "Unsupported as : #{as}" unless c
+
+                     c.new(by.to_sym => part)
+                   else
+                     part
+                   end
+
+        as = part.is_a?(::String) ? new_part.class.name.split('::').last.underscore : nil
+
+        find(part, by: by, as: as) || push(new_part, into: into).tap { body&.call(_1) }
       end
     end
 
@@ -190,7 +199,9 @@ class Protod
       def bind(interpreter)
         raise ArgumentError, "Not bindable interpreter #{interpreter.proto_full_ident} trying bound to #{ident}" unless interpreter.bindable?
         interpreter.set_parent(self)
-        push(interpreter.proto_message, into: :messages, ignore: true)
+        interpreter.proto_message.tap do
+          push(_1, into: :messages) unless has?(_1, in_the: :messages)
+        end
       end
     end
   end

@@ -3,7 +3,7 @@
 class Protod
   module Proto
     class Message < Part
-      include Findable
+      include Parentable
       include FieldCollectable
       include FieldNumeringable
       include InterpreterBindable
@@ -15,8 +15,23 @@ class Protod
         @message_map ? @message_map.fetch(key)[value] : messages.find { _1.public_send(key) == value }
       end
 
-      findable_callback_for(:field, :oneof, key: :ident) do |key, value|
-        @field_map ? @field_map.fetch(key)[value] : fields.find { _1.public_send(key) == value }
+      findable_callback_for(:field, key: :ident) do |key, value|
+        if @field_map
+          @field_map.fetch(key)[value]
+        else
+          [
+            *fields.filter { _1.is_a?(Protod::Proto::Field) },
+            *fields.filter { _1.is_a?(Protod::Proto::Oneof) }.flat_map(&:fields)
+          ].find { _1.public_send(key) == value }
+        end
+      end
+
+      findable_callback_for(:oneof, key: :ident) do |key, value|
+        if @oneof_map
+          @oneof_map.fetch(key)[value]
+        else
+          fields.filter { _1.is_a?(Protod::Proto::Oneof) }.find { _1.public_send(key) == value }
+        end
       end
 
       def has?(part, in_the:)
@@ -70,7 +85,8 @@ class Protod
         numbering_fields_with(1)
 
         @message_map = self.class.findable_keys_for(:message).index_with { |k| messages.index_by(&k.to_sym) }
-        @field_map   = self.class.findable_keys_for(:field).index_with { |k| fields.index_by(&k.to_sym) }
+        @field_map   = self.class.findable_keys_for(:field).index_with { |k| fields.filter { _1.is_a?(Protod::Proto::Field) }.index_by(&k.to_sym) }
+        @oneof_map   = self.class.findable_keys_for(:oneof).index_with { |k| fields.filter { _1.is_a?(Protod::Proto::Oneof) }.index_by(&k.to_sym) }
 
         super
       end

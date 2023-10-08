@@ -70,9 +70,8 @@ RSpec.shared_examples_for :proto_part_ancestor_as do |parentables: []|
 end
 
 RSpec.shared_examples_for :proto_part_push do |childables: []|
-  subject { instance.push(part, into: into, **options) }
+  subject { instance.push(part, into: into) }
   let(:instance) { described_class.new }
-  let(:options) { {} }
 
   shared_examples_for :perform do |with_raise: nil, with_push: true, with_bind: true|
     it do
@@ -99,12 +98,6 @@ RSpec.shared_examples_for :proto_part_push do |childables: []|
         let(:child_ident) { part.ident }
 
         it_behaves_like :perform, with_raise: ArgumentError, with_push: false, with_bind: false
-
-        context "with ignore" do
-          let(:options) { super().merge(ignore: true) }
-         
-          it_behaves_like :perform, with_raise: nil, with_push: false, with_bind: true
-        end
 
         context "has different ident" do
           let(:child_ident) { "#{part.ident}New" }
@@ -159,7 +152,7 @@ RSpec.shared_examples_for :proto_part_find_with_unsupported do |children: []|
   end
 end
 
-RSpec.shared_examples_for :proto_part_find_with_stringified do |value: nil, with_find_or_push_examples: true|
+RSpec.shared_examples_for :proto_part_find_with_stringified do |value: nil, with_find_or_push_examples: { into: nil }|
   subject { instance.find(stringified_part, by: by, **options) }
   let(:options) { super().merge(as: part.class.name.split('::').last.underscore.to_sym ) }
 
@@ -171,6 +164,9 @@ RSpec.shared_examples_for :proto_part_find_with_stringified do |value: nil, with
     if with_find_or_push_examples
       it_behaves_like :proto_part_find_or_push_when, :found do
         let(:find_or_push_part) { stringified_part }
+        if with_find_or_push_examples.is_a?(::Hash) && with_find_or_push_examples[:into].present?
+          let(:into) { with_find_or_push_examples[:into] }
+        end
       end
     end
 
@@ -182,6 +178,9 @@ RSpec.shared_examples_for :proto_part_find_with_stringified do |value: nil, with
       if with_find_or_push_examples
         it_behaves_like :proto_part_find_or_push_when, :not_found do
           let(:find_or_push_part) { stringified_part }
+          if with_find_or_push_examples.is_a?(::Hash) && with_find_or_push_examples[:into].present?
+            let(:into) { with_find_or_push_examples[:into] }
+          end
         end
       end
     end
@@ -191,7 +190,7 @@ end
 RSpec.shared_examples_for :proto_part_find_or_push_when do |the_case|
   subject { instance.find_or_push(find_or_push_part, into: into, by: by, **options) }
   let(:find_or_push_part) { part }
-  let(:into) { (options[:as] || part.class.name.split('::').last.underscore).to_s.pluralize.to_sym }
+  let(:into) { part.class.name.split('::').last.underscore.to_s.pluralize.to_sym }
 
   case the_case
   when :found
@@ -224,21 +223,6 @@ RSpec.shared_examples_for :proto_part_find_or_push_when do |the_case|
     it do
       expect { subject }.to raise_error(ArgumentError, /Can't push already present/)
                               .and not_change { instance.public_send(into).size }
-    end
-
-    context "with ignore" do
-      let(:options) { super().merge(ignore: true) }
-
-      it do
-        if part.parent
-          expect { subject }.to raise_error(ArgumentError, /Can't push already bound/)
-                                  .and not_change { instance.public_send(into).size }
-        else
-          expect { subject }.to not_change { instance.public_send(into).size }
-
-          expect(subject).to eq part
-        end
-      end
     end
   else
     raise ArgumentError, "Unsupported the_case : #{the_case}"
