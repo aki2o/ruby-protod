@@ -62,6 +62,15 @@ FactoryBot.define do
     trait :instance do
       singleton { false }
     end
+
+    trait :has_child do
+      transient do
+        size { 1 }
+      end
+    end
+
+    trait :has_children do
+    end
   end
 
   factory :proto_message, parent: :proto_part, class: Protod::Proto::Message do
@@ -81,6 +90,14 @@ FactoryBot.define do
   end
 
   factory :proto_field, parent: :proto_part, class: Protod::Proto::Field do
+    trait :has_child do
+      transient do
+        size { 1 }
+      end
+    end
+
+    trait :has_children do
+    end
   end
 
   factory :proto_oneof, parent: :proto_part, class: Protod::Proto::Oneof do

@@ -33,7 +33,16 @@ class Protod
             end
           end
 
-          part.ident.in?(idents)
+          part_idents = case part
+                        when Protod::Proto::Field
+                          [part.ident]
+                        when Protod::Proto::Oneof
+                          [part.ident, *part.fields.map(&:ident)]
+                        else
+                          raise ArgumentError, "Unacceptable field : #{part.ident} of #{part.class.name}"
+                        end
+
+          (part_idents & idents).present?
         else
           super
         end

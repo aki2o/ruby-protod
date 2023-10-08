@@ -86,14 +86,17 @@ RSpec.shared_examples_for :proto_part_push do |childables: []|
   end
 
   childables.each do |childable|
-    context "for #{childable}" do
-      let(:part) { build(childable) }
-      let(:into) { childable.to_s.sub('proto_', '').pluralize.to_sym }
+    factory_name, children_name = Array.wrap(childable)
+
+    context "for #{factory_name}" do
+      let(:part) { build(factory_name) }
+      let(:into) { children_name || factory_name.to_s.sub('proto_', '').pluralize.to_sym }
 
       it_behaves_like :perform
 
       context "when pushed already" do
-        before { instance.push(build(childable, ident: part.ident), into: into) }
+        before { instance.push(build(factory_name, ident: child_ident), into: into) }
+        let(:child_ident) { part.ident }
 
         it_behaves_like :perform, with_raise: ArgumentError, with_push: false, with_bind: false
 
@@ -101,6 +104,12 @@ RSpec.shared_examples_for :proto_part_push do |childables: []|
           let(:options) { super().merge(ignore: true) }
          
           it_behaves_like :perform, with_raise: nil, with_push: false, with_bind: true
+        end
+
+        context "has different ident" do
+          let(:child_ident) { "#{part.ident}New" }
+
+          it_behaves_like :perform
         end
       end
 
