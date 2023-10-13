@@ -5,22 +5,7 @@ RSpec.describe Protod::Proto::Builder do
     let(:package) { Protod.find_or_register_package(package_full_ident) }
     let(:package_full_ident) { 'foo.bar.baz' }
 
-    around do |example|
-      Dir.mktmpdir do |dir|
-        dir = Pathname(dir)
-
-        File.write(dir.join('1.rbs'), rbs) if rbs
-
-        Protod.configure do |c|
-          c.setup_rbs_environment_loader { _1.add(path: dir) }
-        end
-
-        Protod.configuration
-
-        example.run
-      end
-    end
-    let(:rbs) { nil }
+    include_context :setup_rbs
 
     shared_examples_for :successful do
       it do

@@ -40,7 +40,3 @@ Shoulda::Matchers.configure do |config|
 end
 
 Dir[Pathname(__dir__).join("support/**/*.rb")].each { |f| require f }
-
-RSpec.shared_context :load_configuration do
-  before { Protod.configuration }
-end

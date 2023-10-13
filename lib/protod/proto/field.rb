@@ -22,13 +22,23 @@ class Protod
         def build_from_rbs(type, on:, **attributes)
           case type
           when RBS::Types::Optional
+            # NOTE: repeated field looks like always not optional
             build_from_rbs(type.type, on: on, **attributes.merge(optional: attributes[:repeated] ? false : true))
           when RBS::Types::Union
-            real_type = type.types.find { _1.name.kind == :class && Protod.rbs_environment.class_decls.key?(_1.name) }
+            prior_type = type.types.find do
+              name = _1.is_a?(RBS::Types::Optional) ? _1.type.name : _1.name
 
-            raise ArgumentError, "Not found declared class in union type on #{on}" unless real_type
+              case name.kind
+              when :class
+                Protod.rbs_environment.class_decls.key?(name)
+              when :alias
+                Protod.rbs_environment.type_alias_decls.key?(name)
+              end
+            end
 
-            build_from_rbs(real_type, on: on, **attributes)
+            raise ArgumentError, "Not found declared class in union type on #{on}" unless prior_type
+
+            build_from_rbs(prior_type, on: on, **attributes)
           when RBS::Types::Alias
             alias_decl = Protod.rbs_environment.type_alias_decls[type.name]
 
@@ -38,16 +48,16 @@ class Protod
           when RBS::Types::ClassInstance
             case
             when should_repeated_with(type.name.to_s.safe_constantize)
+              # NOTE: repeated field looks like always not optional
               build_from_rbs(type.args.first, on: on, **attributes.merge(optional: false, repeated: true))
             when type.args.size > 0
-              raise NotImplementedError, "Unsupported rbs type : Record or Tuple on #{on}"
+              raise NotImplementedError, "Unsupported rbs type : multiple type.args of #{type.name.to_s} on #{on}"
             else
               build_from(type.name.to_s, **attributes)
             end
           when RBS::Types::Bases::Base
             build_from(type.class.name, **attributes)
           else
-            binding.pry
             raise NotImplementedError, "Unsupported rbs type : #{type.class.name} on #{on}"
           end
         end

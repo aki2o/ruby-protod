@@ -222,4 +222,34 @@ RSpec.describe Protod::Proto::Message, type: :model do
       end
     end
   end
+
+  describe "#pb_const" do
+    subject { instance.pb_const }
+    let(:instance) { build(:proto_message, parent: parent) }
+    let(:parent) { nil }
+
+    it { expect { subject }.to raise_error(NotImplementedError) }
+
+    context "when parent" do
+      let(:parent) { build([:proto_package, :proto_message].sample) }
+
+      before do
+        mock_descriptor = double('Google::Protobuf::Descriptor').tap do
+          allow(_1).to receive(:msgclass).and_return(expected_const)
+        end
+
+        mock_pool = double('Google::Protobuf::DescriptorPool').tap do
+          allow(_1).to receive(:lookup).with("#{parent.full_ident}.#{instance.ident}").and_return(mock_descriptor)
+        end
+
+        stub_const('Google::Protobuf::DescriptorPool', Class.new).tap do
+          allow(_1).to receive(:generated_pool).and_return(mock_pool)
+        end
+      end
+      let(:expected_const) { stub_const(expected_const_name, Class.new) }
+      let(:expected_const_name) { "#{parent.full_ident.split('.').map(&:classify).join('::')}::#{instance.ident.classify}" }
+
+      it { is_expected.to eq expected_const }
+    end
+  end
 end
