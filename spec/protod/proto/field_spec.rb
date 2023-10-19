@@ -100,60 +100,61 @@ RSpec.describe Protod::Proto::Field, type: :model do
     end
   end
 
-  # describe "#void?" do
-  #   subject { instance.void? }
-  #   let(:instance) { described_class.new }
+  describe "#void?" do
+    subject { instance.void? }
+    let(:instance) { described_class.new }
 
-  #   it { is_expected.to eq false }
+    it { is_expected.to eq false }
 
-  #   context "having interpreter" do
-  #     let(:instance) { described_class.build_from(type) }
-  #     let(:type) { (Protod::Interpreter.all - void_types).sample }
-  #     let(:void_types) { %w[::RBS::Types::Bases::Void ::RBS::Types::Bases::Nil] }
+    context "having interpreter" do
+      let(:instance) { described_class.build_from(type) }
+      let(:type) { (Protod::Interpreter.keys - void_types).sample }
+      let(:void_types) { %w[::RBS::Types::Bases::Void ::RBS::Types::Bases::Nil] }
 
-  #     include_context :load_configuration
+      include_context :load_configuration
 
-  #     it { is_expected.to eq false }
+      it { is_expected.to eq false }
 
-  #     context "that's void" do
-  #       let(:type) { void_types.sample }
+      context "that's void" do
+        let(:type) { void_types.sample }
 
-  #       it { is_expected.to eq true }
-  #     end
-  #   end
-  # end
+        it { is_expected.to eq true }
+      end
+    end
+  end
 
-  # describe "#to_proto" do
-  #   subject { instance.to_proto }
-  #   let(:instance) { described_class.new(**attributes) }
-  #   let(:attributes) { { ident: 'f1' } }
+  describe "#to_proto" do
+    subject { instance.to_proto }
+    let(:instance) { described_class.new(**attributes) }
+    let(:attributes) { { ident: 'f1' } }
 
-  #   it { expect { subject }.to raise_error(ArgumentError) }
+    it { expect { subject }.to raise_error(ArgumentError) }
 
-  #   context "having interpreter" do
-  #     let(:attributes) { super().merge(interpreter: Protod::Interpreter.find_by(type)) }
-  #     let(:type) { 'Integer' }
+    context "having interpreter" do
+      let(:attributes) { super().merge(interpreter: Protod::Interpreter.find_by(type)) }
+      let(:type) { 'Integer' }
 
-  #     include_context :load_configuration
+      include_context :load_configuration
 
-  #     it { is_expected.to eq "int64 f1;" }
+      it { is_expected.to eq "sint64 f1 = 1;" }
 
-  #     context "and other" do
-  #       let(:attributes) { super().merge(optional: optional, repeated: repeated) }
+      context "and other" do
+        let(:attributes) { super().merge(optional: optional, repeated: repeated, index: index).compact }
 
-  #       where(:type, :optional, :repeated, :expected_value) do
-  #         [
-  #           ['Integer', true, false, "optional int64 f1;"],
-  #           ['Integer', false, true, "repeated int64 f1;"],
-  #           ['Integer', true,  true, "optional repeated int64 f1;"],
-  #           ['Date',    true,  true, "optional repeated google.type.Date f1;"],
-  #         ]
-  #       end
+        where(:type, :optional, :repeated, :index, :expected_value) do
+          [
+            ['Integer', true, false, nil, "optional sint64 f1 = 1;"],
+            ['Integer', false, true, nil, "repeated sint64 f1 = 1;"],
+            ['Integer', true,  true, nil, "repeated sint64 f1 = 1;"],
+            ['Date',    true,  true, nil, "repeated google.type.Date f1 = 1;"],
+            ['Integer', true,  true, 2,   "repeated sint64 f1 = 2;"],
+          ]
+        end
 
-  #       with_them do
-  #         it { is_expected.to eq expected_value }
-  #       end
-  #     end
-  #   end
-  # end
+        with_them do
+          it { is_expected.to eq expected_value }
+        end
+      end
+    end
+  end
 end

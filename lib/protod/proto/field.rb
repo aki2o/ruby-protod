@@ -83,7 +83,7 @@ class Protod
         [
           format_proto(''),
           [
-            # optional ? 'optional' : nil,
+            optional && repeated.! ? 'optional' : nil, # NOTE: repeated field looks like always not optional
             repeated ? 'repeated' : nil,
             type_part,
             ident,
